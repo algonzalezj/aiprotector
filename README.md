@@ -1,70 +1,57 @@
 # AI Protector 🛡️
 
-
-
-Descripción
-
+## Descripción
 AI Protector es una plataforma avanzada de ciberseguridad basada en Inteligencia Artificial diseñada para detectar amenazas mediante el análisis inteligente de logs en tiempo real. La aplicación permite identificar anomalías y comportamientos sospechosos, clasificándolos según su gravedad para facilitar una rápida respuesta y mitigación.
 
-Características principales
+## Características Principales
+- **Recepción y almacenamiento de logs mediante API**.
+- **Análisis de logs con Machine Learning y Deep Learning**.
+- **Alertas automáticas en tiempo real**.
+- **Dashboard visual e interactivo** para monitorización.
 
-Recepción y almacenamiento eficiente de logs mediante API.
+## Instalación
 
-Análisis inteligente de datos usando Machine Learning y Deep Learning.
-
-Generación automática de alertas en tiempo real.
-
-Dashboard interactivo y visualmente atractivo para monitorización.
-
-Instalación
-
-Clona el repositorio
-
+### Clonar repositorio
 ```bash
 git clone https://github.com/tu-usuario/ai-protector.git
 cd ai-protector
 ```
 
-Crea y activa el entorno virtual:
+### Crear entorno virtual
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux/MacOS
-.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux o MacOS
+.\venv\Scripts\activate   # Windows
 ```
-Instala dependencias:
+
+### Instalar dependencias
 ```bash
 pip install -r requirements.txt
 ```
-Ejecuta la aplicación:
+
+### Ejecutar la aplicación
 ```bash
 python app.py
 ```
-Accede a la aplicación en: http://localhost:5000
 
-Tecnologías utilizadas
+Accede al dashboard desde: `http://localhost:5000`
 
-Python
+## Tecnologías Utilizadas
+- Python
+- Flask
+- Elasticsearch
+- Scikit-learn, TensorFlow
+- AdminLTE
 
-Flask/FastAPI
+## Contribuir
+¡Las contribuciones son bienvenidas!
 
-Elasticsearch
+1. Haz un fork del repositorio.
+2. Crea tu rama de función: `git checkout -b feature/nueva-funcionalidad`
+3. Realiza cambios y haz commit.
+4. Envía una pull request para revisión.
 
-AdminLTE Dashboard
+## Licencia
+Este proyecto está licenciado bajo la licencia **Apache 2.0**.
 
-Scikit-learn, TensorFlow
 
-Contribuciones
-
-Las contribuciones son bienvenidas. Para colaborar:
-
-Haz fork del proyecto.
-
-Crea una rama (git checkout -b feature/nueva-caracteristica).
-
-Realiza tus modificaciones.
-
-Envía una Pull Request.
-
-Licencia
-
-Este proyecto se distribuye bajo licencia Apache 2.0.
