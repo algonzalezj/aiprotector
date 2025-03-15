@@ -20,6 +20,7 @@ Instalación
 
 Clona el repositorio
 
+```bash
 git clone https://github.com/tu-usuario/ai-protector.git
 cd ai-protector
 
