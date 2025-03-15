@@ -23,13 +23,14 @@ Clona el repositorio
 ```bash
 git clone https://github.com/tu-usuario/ai-protector.git
 cd ai-protector
+```
 
 Crea y activa el entorno virtual:
-
+```bash
 python -m venv venv
 source venv/bin/activate  # Linux/MacOS
 .\venv\Scripts\activate  # Windows
-
+```
 Instala dependencias:
 
 pip install -r requirements.txt
