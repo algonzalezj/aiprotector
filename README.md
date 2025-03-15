@@ -13,7 +13,7 @@ AI Protector es una plataforma avanzada de ciberseguridad basada en Inteligencia
 
 ### Clonar repositorio
 ```bash
-git clone https://github.com/tu-usuario/ai-protector.git
+git clone https://github.com/algonzalezj/ai-protector.git
 cd ai-protector
 ```
 
