@@ -32,13 +32,13 @@ source venv/bin/activate  # Linux/MacOS
 .\venv\Scripts\activate  # Windows
 ```
 Instala dependencias:
-
+```bash
 pip install -r requirements.txt
-
+```
 Ejecuta la aplicación:
-
+```bash
 python app.py
-
+```
 Accede a la aplicación en: http://localhost:5000
 
 Tecnologías utilizadas
