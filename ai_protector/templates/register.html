@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Registro | AI Protector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/adminlte.min.css') }}">
+</head>
+
+<body class="login-page">
+    <div class="login-box">
+        <div class="login-logo"><b>AI</b>Protector</div>
+        <div class="card">
+            <div class="card-body login-card-body">
+                <p class="login-box-msg">Crea tu cuenta</p>
+
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="post">
+                    <div class="input-group mb-3">
+                        <input name="username" type="text" class="form-control" placeholder="Usuario" required>
+                    </div>
+                    <div class="input-group mb-3">
+                        <input name="password" type="password" class="form-control" placeholder="Contraseña" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <a href="{{ url_for('login') }}">Ya tengo cuenta</a>
+                        </div>
+                        <div class="col-6 text-right">
+                            <button type="submit" class="btn btn-success btn-block">Registrarse</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='dist/js/adminlte.min.js') }}"></script>
+</body>
+
+</html>

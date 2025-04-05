@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  sqlite:
+    image: nouchka/sqlite3:latest
+    container_name: sqlite-db
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/root/db

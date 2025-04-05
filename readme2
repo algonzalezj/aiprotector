@@ -1,0 +1,3 @@
+Si necesitas acceder al sqlite por terminal:
+
+    - docker exec -it sqlite-db sqlite3 /root/db/app.db
