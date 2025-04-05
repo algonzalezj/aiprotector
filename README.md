@@ -13,13 +13,13 @@ AI Protector es una plataforma avanzada de ciberseguridad basada en Inteligencia
 
 ### Clonar repositorio
 ```bash
-git clone https://github.com/algonzalezj/ai-protector.git
-cd ai-protector
+git clone https://github.com/algonzalezj/aiprotector.git
+cd ai_protector
 ```
 
 ### Crear entorno virtual
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Linux o MacOS
 .\venv\Scripts\activate   # Windows
 ```
@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 ### Ejecutar la aplicación
 ```bash
-python app.py
+python3 app.py
 ```
 
 Accede al dashboard desde: `http://localhost:5000`
