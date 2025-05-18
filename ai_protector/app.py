@@ -2,10 +2,13 @@ from flask import Flask, render_template, request, redirect, url_for, make_respo
 import sqlite3
 import jwt
 import datetime
+import requests
+from flask import jsonify
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 DATABASE = "data/app.db"
+ELASTIC_URL = "http://localhost:9200/logs/_doc"
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -81,6 +84,25 @@ def logout():
     resp = make_response(redirect(url_for('login')))
     resp.set_cookie('token', '', expires=0)
     return resp
+
+@app.route('/logs', methods=['POST'])
+def receive_log():
+    if not request.is_json:
+        return jsonify({"error": "Formato no válido"}), 400
+
+    data = request.get_json()
+
+    # Opcional: añade timestamp aquí si no viene en la data
+    from datetime import datetime
+    data['received_at'] = datetime.utcnow().isoformat()
+
+    # Enviar a Elasticsearch
+    try:
+        es_resp = requests.post(ELASTIC_URL, json=data)
+        es_resp.raise_for_status()
+        return jsonify({"message": "Log recibido", "es_id": es_resp.json()["_id"]}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def init_db():
     conn = sqlite3.connect("data/app.db")
