@@ -5,6 +5,7 @@ import requests
 from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 DATABASE = "data/app.db"
@@ -54,11 +55,11 @@ def login():
 
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+        c.execute("SELECT * FROM users WHERE username=?", (username,))
         user = c.fetchone()
         conn.close()
 
-        if user:
+        if user and check_password_hash(user[2], password):  # user[2] es la columna 'password'
             token = create_token(username)
             return jsonify({"token": token})
         else:
@@ -71,11 +72,11 @@ def login():
 
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+        c.execute("SELECT * FROM users WHERE username=?", (username,))
         user = c.fetchone()
         conn.close()
 
-        if user:
+        if user and check_password_hash(user[2], password):  # user[2] es la columna 'password'
             token = create_token(username)
             resp = make_response(redirect(url_for('index')))
             resp.set_cookie('token', token)
@@ -95,7 +96,8 @@ def register():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, password, 'user'))
+            hashed_password = generate_password_hash(password)
+            c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, hashed_password, 'user'))
             conn.commit()
             conn.close()
             return redirect(url_for('login'))
