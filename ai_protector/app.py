@@ -95,7 +95,7 @@ def register():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+            c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, password, 'user'))
             conn.commit()
             conn.close()
             return redirect(url_for('login'))
@@ -164,7 +164,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('admin', 'user', 'server'))
         )
     """)
     conn.commit()
