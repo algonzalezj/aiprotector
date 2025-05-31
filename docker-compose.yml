@@ -15,7 +15,7 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
       - "9200:9200"
     volumes:
@@ -28,6 +28,17 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
       - "5601:5601"
+  api:
+    build:
+      context: ./ai_protector
+    container_name: aiprotector-api
+    ports:
+      - "5000:5000"
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTIC_URL=http://elasticsearch:9200/logs/_doc
+      - SECRET_KEY=clave-ultrasecreta
 
 volumes:
   esdata:

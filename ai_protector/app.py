@@ -1,14 +1,15 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response
+from flask import Flask, render_template, request, redirect, url_for, make_response, jsonify
 import sqlite3
 import jwt
-import datetime
 import requests
-from flask import jsonify
+from dotenv import load_dotenv
+import os
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'supersecretkey'
 DATABASE = "data/app.db"
-ELASTIC_URL = "http://localhost:9200/logs/_doc"
+SECRET_KEY = os.getenv('SECRET_KEY')
+ELASTIC_URL = os.getenv('ELASTIC_URL')
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -17,13 +18,13 @@ def get_db():
 def create_token(username):
     payload = {
         'username': username,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+        'exp': datetime.now(timezone.utc) + timedelta(hours=2)
     }
-    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
 def decode_token(token):
     try:
-        return jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
     except:
         return None
 
@@ -44,21 +45,46 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+
+    # Si es JSON (desde API o curl)
+    if request.is_json:
+        datos = request.get_json()
+        username = datos.get('username')
+        password = datos.get('password')
+
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
         user = c.fetchone()
         conn.close()
+
+        if user:
+            token = create_token(username)
+            return jsonify({"token": token})
+        else:
+            return jsonify({"error": "Credenciales inválidas"}), 401
+
+    # Si es POST desde navegador (formulario)
+    elif request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+        user = c.fetchone()
+        conn.close()
+
         if user:
             token = create_token(username)
             resp = make_response(redirect(url_for('index')))
             resp.set_cookie('token', token)
             return resp
-        error = "Credenciales incorrectas"
+        else:
+            error = "Credenciales incorrectas"
+
     return render_template('login.html', error=error)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -85,24 +111,51 @@ def logout():
     resp.set_cookie('token', '', expires=0)
     return resp
 
+# envío de logs siendo un usuario
 @app.route('/logs', methods=['POST'])
 def receive_log():
+    username = get_user_from_token()
+    if not username:
+        return jsonify({"error": "No autorizado"}), 401
+
     if not request.is_json:
         return jsonify({"error": "Formato no válido"}), 400
 
     data = request.get_json()
+    data['received_at'] = datetime.datetime.now(datetime.UTC).isoformat()
+    data['submitted_by'] = username  # opcional: quién lo envió
 
-    # Opcional: añade timestamp aquí si no viene en la data
-    from datetime import datetime
-    data['received_at'] = datetime.utcnow().isoformat()
-
-    # Enviar a Elasticsearch
     try:
         es_resp = requests.post(ELASTIC_URL, json=data)
         es_resp.raise_for_status()
         return jsonify({"message": "Log recibido", "es_id": es_resp.json()["_id"]}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ruta válida para el envío desde servidores, agregando token jwt en la cabecera
+@app.route('/api/logs', methods=['POST'])
+def api_receive_log():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace("Bearer ", "")
+    data_decoded = decode_token(token)
+
+    if not data_decoded:
+        return jsonify({"error": "Token inválido o expirado"}), 401
+
+    if not request.is_json:
+        return jsonify({"error": "Formato no válido"}), 400
+
+    data = request.get_json()
+    data['received_at'] = datetime.datetime.utcnow().isoformat()
+    data['submitted_by'] = data_decoded.get("username")
+
+    try:
+        es_resp = requests.post(ELASTIC_URL, json=data)
+        es_resp.raise_for_status()
+        return jsonify({"message": "Log recibido", "es_id": es_resp.json()["_id"]}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 def init_db():
     conn = sqlite3.connect("data/app.db")

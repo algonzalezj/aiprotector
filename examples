@@ -1,0 +1,12 @@
+# Para hacer una llamada de envío de log al api por curl
+
+curl -X POST http://localhost:5000/api/logs \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NDg2OTYwMjB9.SRsKs_dKJMXHNzL8CSxhuHblrO0jgLDuJl9LjEn49ow" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "host": "srv-web-01",
+    "timestamp": "2025-05-31T21:00:00Z",
+    "log_type": "web",
+    "message": "Intento de acceso no autorizado",
+    "severity": "critical"
+}'

@@ -35,6 +35,8 @@ python3 app.py
 ```
 
 Accede al dashboard desde: `http://localhost:5000`
+Accede a kibana desde : `http://localhost:5601`
+Accede a los índices de elasticsearch: `http://localhost:9200/_cat/indices?`
 
 ## Tecnologías Utilizadas
 - Python

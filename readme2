@@ -7,3 +7,7 @@ Para ver los docjer arrancados:
 
 Para ver elasticsearch arrancado:
     - http://localhost:9200/
+
+Para hacer funcionar el entorno, necesitas un .env en el raiz con datos secretos:
+    - SECRET_KEY=clave secreta para generar los tokens
+    - ELASTIC_URL=http://elasticsearch:9200/logs/_doc
