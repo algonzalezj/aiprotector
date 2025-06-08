@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Usuarios | AI Protector{% endblock %}
+
+{% block content %}
+<h3>Gestión de usuarios</h3>
+
+<form method="POST" action="{{ url_for('add_user') }}" class="mb-4">
+  <div class="form-row">
+    <div class="col">
+      <input type="text" name="username" class="form-control" placeholder="Usuario" required>
+    </div>
+    <div class="col">
+      <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
+    </div>
+    <div class="col">
+      <select name="role" class="form-control" required>
+        <option value="user">Usuario</option>
+        <option value="server">Servidor</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </div>
+    <div class="col">
+      <button type="submit" class="btn btn-success">Crear</button>
+    </div>
+  </div>
+</form>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+      <tr>
+        <td>{{ u[0] }}</td>
+        <td>{{ u[1] }}</td>
+        <td>{{ u[2] }}</td>
+        <td>
+          {% if u[1] != username %}
+          <form method="POST" action="{{ url_for('delete_user', user_id=u[0]) }}">
+            <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar este usuario?')">Eliminar</button>
+          </form>
+          {% else %}
+          <em>Actual</em>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

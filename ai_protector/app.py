@@ -86,7 +86,6 @@ def login():
 
     return render_template('login.html', error=error)
 
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     error = None
@@ -106,6 +105,66 @@ def register():
         except Exception as e:
             error = f"Error inesperado: {str(e)}"
     return render_template('register.html', error=error)
+
+# Ver listado de usuarios
+@app.route('/admin/users')
+def manage_users():
+    current_user = get_user_from_token()
+    if not current_user:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT role FROM users WHERE username=?", (current_user,))
+    if c.fetchone()[0] != 'admin':
+        return "Acceso denegado", 403
+
+    c.execute("SELECT id, username, role FROM users")
+    users = c.fetchall()
+    conn.close()
+    return render_template('admin_users.html', username=current_user, users=users)
+
+# Crear nuevo usuario
+@app.route('/admin/users/add', methods=['POST'])
+def add_user():
+    current_user = get_user_from_token()
+    if not current_user:
+        return redirect(url_for('login'))
+
+    username = request.form['username']
+    password = request.form['password']
+    role = request.form['role']
+    hashed = generate_password_hash(password)
+
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                  (username, hashed, role))
+        conn.commit()
+        conn.close()
+        flash("Usuario creado correctamente", "success")
+    except sqlite3.IntegrityError:
+        flash("El usuario ya existe", "danger")
+
+    return redirect(url_for('manage_users'))
+
+# Eliminar usuario
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    current_user = get_user_from_token()
+    if not current_user:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM users WHERE id=? AND username!=?", (user_id, current_user))
+    conn.commit()
+    conn.close()
+    flash("Usuario eliminado", "info")
+
+    return redirect(url_for('manage_users'))
+
 
 @app.route('/logout')
 def logout():
