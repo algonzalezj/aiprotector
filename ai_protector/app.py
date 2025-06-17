@@ -195,7 +195,7 @@ def submit_log_manual():
 
                 {str(data)}
 
-                Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO."""
+                Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO. No añadas explicación. Responde solo con la categoría."""
             try:
                 ollama_resp = requests.post(
                     OLLAMA_URL,
