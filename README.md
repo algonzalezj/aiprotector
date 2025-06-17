@@ -16,6 +16,11 @@ AI Protector es una plataforma avanzada de ciberseguridad basada en Inteligencia
 git clone https://github.com/algonzalezj/aiprotector.git
 cd ai_protector
 ```
+### Arrancar el entorno
+```bash
+docker compose up -d --build
+```
+SOLO PARA DEVS
 
 ### Crear entorno virtual
 ```bash
@@ -37,6 +42,7 @@ python3 app.py
 Accede al dashboard desde: `http://localhost:5000`
 Accede a kibana desde : `http://localhost:5601`
 Accede a los índices de elasticsearch: `http://localhost:9200/_cat/indices?`
+Acceder a ollama : `http://localhost:11434` 
 
 ## Tecnologías Utilizadas
 - Python
@@ -44,6 +50,7 @@ Accede a los índices de elasticsearch: `http://localhost:9200/_cat/indices?`
 - Elasticsearch
 - Scikit-learn, TensorFlow
 - AdminLTE
+- Ollama
 
 ## Contribuir
 ¡Las contribuciones son bienvenidas!

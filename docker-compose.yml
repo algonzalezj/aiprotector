@@ -39,6 +39,15 @@ services:
     environment:
       - ELASTIC_URL=http://elasticsearch:9200/logs/_doc
       - SECRET_KEY=clave-ultrasecreta
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   esdata:
+  ollama_data:

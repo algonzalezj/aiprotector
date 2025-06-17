@@ -10,3 +10,11 @@ curl -X POST http://localhost:5000/api/logs \
     "message": "Intento de acceso no autorizado",
     "severity": "critical"
 }'
+
+# Para hacer una llamada a ollama:
+
+curl http://localhost:11434/api/generate -d '{
+  "model": "llama3",
+  "prompt": "¿Es este log sospechoso?: 192.168.1.20 - - [09/Jun/2025:10:14:32 +0000] \"POST /admin HTTP/1.1\" 401",
+  "stream": false
+}' -H "Content-Type: application/json"
