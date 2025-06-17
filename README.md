@@ -18,7 +18,7 @@ cd ai_protector
 ```
 ### Arrancar el entorno
 ```bash
-docker compose up -d --build
+docker compose up -d elasticsearch kibana ollama sqlite
 ```
 SOLO PARA DEVS
 

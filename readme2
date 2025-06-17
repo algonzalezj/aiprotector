@@ -11,3 +11,53 @@ Para ver elasticsearch arrancado:
 Para hacer funcionar el entorno, necesitas un .env en el raiz con datos secretos:
     - SECRET_KEY=clave secreta para generar los tokens
     - ELASTIC_URL=http://elasticsearch:9200/logs/_doc
+
+MENSAJE CRITICO
+curl -X POST http://localhost:5000/api/logs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTAyMDEzNTN9.xFKaA6g9yNm8QrUey-RVmxXu2UPORjeWMNB5CG0J1BQ" \
+  -d '{
+    "source_ip": "192.168.1.30",
+    "timestamp": "2025-06-09T12:01:00Z",
+    "message": "Successful login as root via SSH from external IP 45.83.22.110",
+    "level": "critical",
+    "service": "ssh"
+}'
+
+
+MENSAJE ALTO
+curl -X POST http://localhost:5000/api/logs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTAyMDEzNTN9.xFKaA6g9yNm8QrUey-RVmxXu2UPORjeWMNB5CG0J1BQ" \
+  -d '{
+    "source_ip": "203.0.113.45",
+    "timestamp": "2025-06-09T12:15:00Z",
+    "message": "5 failed login attempts to /admin from IP 203.0.113.45 in 1 minute",
+    "level": "warning",
+    "service": "webserver"
+}'
+
+MENSAJE MEDIO
+curl -X POST http://localhost:5000/api/logs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTAyMDEzNTN9.xFKaA6g9yNm8QrUey-RVmxXu2UPORjeWMNB5CG0J1BQ" \
+  -d '{
+    "source_ip": "198.51.100.77",
+    "timestamp": "2025-06-09T12:30:00Z",
+    "message": "Port scan detected from 198.51.100.77 (ports 22, 80, 443)",
+    "level": "info",
+    "service": "firewall"
+}'
+
+MENSAJE BAJO
+
+curl -X POST http://localhost:5000/api/logs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTAyMDEzNTN9.xFKaA6g9yNm8QrUey-RVmxXu2UPORjeWMNB5CG0J1BQ" \
+  -d '{
+    "source_ip": "10.0.0.5",
+    "timestamp": "2025-06-09T12:45:00Z",
+    "message": "User jdoe logged in successfully from IP 10.0.0.5",
+    "level": "info",
+    "service": "ssh"
+}'

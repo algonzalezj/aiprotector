@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Analizar Logs Manualmente | AI Protector{% endblock %}
+
+{% block content %}
+<h3>Analizar Logs Manualmente</h3>
+
+<form method="post">
+    <div class="form-group">
+        <label for="log">Pega aquí el log (formato JSON):</label>
+        <textarea name="log" id="log" rows="10" class="form-control" required>{{ log_data or '' }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Analizar</button>
+</form>
+
+{% if result %}
+<div class="alert alert-info mt-3">
+    <strong>Diagnóstico IA:</strong> {{ result }}
+</div>
+{% endif %}
+{% endblock %}

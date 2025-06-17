@@ -11,6 +11,8 @@ app = Flask(__name__)
 DATABASE = "data/app.db"
 SECRET_KEY = os.getenv('SECRET_KEY')
 ELASTIC_URL = os.getenv('ELASTIC_URL')
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "llama3"
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -172,26 +174,53 @@ def logout():
     resp.set_cookie('token', '', expires=0)
     return resp
 
-# envío de logs siendo un usuario
-@app.route('/logs', methods=['POST'])
-def receive_log():
+@app.route('/logs/manual', methods=['GET', 'POST'])
+def submit_log_manual():
     username = get_user_from_token()
     if not username:
-        return jsonify({"error": "No autorizado"}), 401
+        return redirect(url_for('login'))
 
-    if not request.is_json:
-        return jsonify({"error": "Formato no válido"}), 400
+    result = None
+    log_data = ""
 
-    data = request.get_json()
-    data['received_at'] = datetime.datetime.now(datetime.UTC).isoformat()
-    data['submitted_by'] = username  # opcional: quién lo envió
+    if request.method == 'POST':
+        try:
+            log_data = request.form['log']
+            data = eval(log_data)  # ⚠️ Usar json.loads() en producción
+            data['received_at'] = datetime.now(timezone.utc).isoformat()
+            data['submitted_by'] = username
 
-    try:
-        es_resp = requests.post(ELASTIC_URL, json=data)
-        es_resp.raise_for_status()
-        return jsonify({"message": "Log recibido", "es_id": es_resp.json()["_id"]}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            # Llamada a Ollama
+            prompt = f"""Evalúa el siguiente log de ciberseguridad:
+
+                {str(data)}
+
+                Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO."""
+            try:
+                ollama_resp = requests.post(
+                    OLLAMA_URL,
+                    json={
+                        "model": OLLAMA_MODEL,
+                        "prompt": prompt,
+                        "stream": False
+                    },
+                    timeout=30
+                )
+                ollama_resp.raise_for_status()
+                result = ollama_resp.json().get("response", "").strip()
+                data["ollama_diagnosis"] = result
+            except Exception as e:
+                result = f"Error llamando a Ollama: {str(e)}"
+                data["ollama_diagnosis"] = result
+
+            # Guardar en Elasticsearch
+            requests.post(ELASTIC_URL, json=data)
+
+        except Exception as e:
+            result = f"Error procesando el log: {str(e)}"
+
+    return render_template("submit_log.html", result=result, log_data=log_data)
+
 
 # ruta válida para el envío desde servidores, agregando token jwt en la cabecera
 @app.route('/api/logs', methods=['POST'])
@@ -207,13 +236,44 @@ def api_receive_log():
         return jsonify({"error": "Formato no válido"}), 400
 
     data = request.get_json()
-    data['received_at'] = datetime.datetime.utcnow().isoformat()
+    log_text = str(data)  # Convertimos el dict completo a string para analizar
+
+    # Enviar el log a Ollama
+    prompt = f"""Analiza este log de ciberseguridad:
+
+        {log_text}
+
+        Devuélveme únicamente una de estas categorías de riesgo: CRÍTICO, ALTO, MEDIO, BAJO. 
+        No añadas explicación. Responde solo con la categoría."""
+    try:
+        ollama_resp = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False
+            },
+            timeout=60
+        )
+        ollama_resp.raise_for_status()
+        response_text = ollama_resp.json().get("response", "").strip()
+        print(f"[Ollama → Análisis]: {response_text}")
+    except Exception as e:
+        print(f"[ERROR → Ollama]: {e}")
+        response_text = "Error al analizar con Ollama"
+
+    # Añadir metainformación al log y enviarlo a Elasticsearch
+    data['received_at'] = datetime.now(timezone.utc).isoformat()
     data['submitted_by'] = data_decoded.get("username")
+    data['ollama_diagnosis'] = response_text  # (opcional) guardar respuesta de Ollama en Elasticsearch
 
     try:
         es_resp = requests.post(ELASTIC_URL, json=data)
         es_resp.raise_for_status()
-        return jsonify({"message": "Log recibido", "es_id": es_resp.json()["_id"]}), 201
+        return jsonify({
+            "message": "Log recibido",
+            "es_id": es_resp.json()["_id"]
+        }), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
