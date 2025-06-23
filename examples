@@ -1,5 +1,4 @@
 # Para hacer una llamada de envío de log al api por curl
-
 curl -X POST http://localhost:5000/api/logs \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NDg2OTYwMjB9.SRsKs_dKJMXHNzL8CSxhuHblrO0jgLDuJl9LjEn49ow" \
   -H "Content-Type: application/json" \
@@ -12,7 +11,6 @@ curl -X POST http://localhost:5000/api/logs \
 }'
 
 # Para hacer una llamada a ollama:
-
 curl http://localhost:11434/api/generate -d '{
   "model": "llama3",
   "prompt": "¿Es este log sospechoso?: 192.168.1.20 - - [09/Jun/2025:10:14:32 +0000] \"POST /admin HTTP/1.1\" 401",

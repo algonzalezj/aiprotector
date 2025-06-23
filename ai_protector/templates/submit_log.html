@@ -5,6 +5,15 @@
 {% block content %}
 <h3>Analizar Logs Manualmente</h3>
 
+<!-- Botones de plantillas -->
+<div class="mb-3">
+    <p><strong>Cargar plantilla rápida:</strong></p>
+    <button type="button" class="btn btn-danger btn-sm" onclick="cargarEjemplo('CRÍTICO')">🔴 CRÍTICO</button>
+    <button type="button" class="btn btn-warning btn-sm" onclick="cargarEjemplo('ALTO')">🟠 ALTO</button>
+    <button type="button" class="btn btn-info btn-sm" onclick="cargarEjemplo('MEDIO')">🟡 MEDIO</button>
+    <button type="button" class="btn btn-success btn-sm" onclick="cargarEjemplo('BAJO')">🟢 BAJO</button>
+</div>
+
 <form method="post">
     <div class="form-group">
         <label for="log">Pega aquí el log (formato JSON):</label>
@@ -14,8 +23,52 @@
 </form>
 
 {% if result %}
-<div class="alert alert-info mt-3">
-    <strong>Diagnóstico IA:</strong> {{ result }}
-</div>
+    {% set alert_class = {
+        'CRÍTICO': 'alert-danger',
+        'ALTO': 'alert-warning',
+        'MEDIO': 'alert-info',
+        'BAJO': 'alert-success'
+    }[risk_level] if risk_level in ['CRÍTICO', 'ALTO', 'MEDIO', 'BAJO'] else 'alert-secondary' %}
+
+    <div class="alert {{ alert_class }} mt-3">
+        <strong>Diagnóstico IA:</strong> {{ result }}
+    </div>
 {% endif %}
+
+<script>
+function cargarEjemplo(tipo) {
+    const now = new Date().toISOString();
+    let ejemplos = {
+        'CRÍTICO': {
+            "source_ip": "192.168.1.30",
+            "timestamp": now,
+            "message": "Root access granted via SSH from unknown external IP 45.83.22.110",
+            "level": "critical",
+            "service": "ssh"
+        },
+        'ALTO': {
+            "source_ip": "203.0.113.45",
+            "timestamp": now,
+            "message": "5 failed login attempts to /admin from IP 203.0.113.45 in 1 minute",
+            "level": "warning",
+            "service": "webserver"
+        },
+        'MEDIO': {
+            "source_ip": "198.51.100.77",
+            "timestamp": now,
+            "message": "Port scan detected on ports 22, 80, 443 from external IP",
+            "level": "info",
+            "service": "firewall"
+        },
+        'BAJO': {
+            "source_ip": "10.0.0.5",
+            "timestamp": now,
+            "message": "User jdoe logged in successfully from internal IP 10.0.0.5",
+            "level": "info",
+            "service": "ssh"
+        }
+    };
+    document.getElementById("log").value = JSON.stringify(ejemplos[tipo], null, 2);
+}
+</script>
 {% endblock %}

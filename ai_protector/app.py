@@ -182,20 +182,21 @@ def submit_log_manual():
 
     result = None
     log_data = ""
+    risk_level = "DESCONOCIDO"
 
     if request.method == 'POST':
         try:
             log_data = request.form['log']
-            data = eval(log_data)  # ⚠️ Usar json.loads() en producción
+            data = eval(log_data)  # ⚠️ Sustituye por json.loads() en producción
             data['received_at'] = datetime.now(timezone.utc).isoformat()
             data['submitted_by'] = username
 
             # Llamada a Ollama
             prompt = f"""Evalúa el siguiente log de ciberseguridad:
 
-                {str(data)}
+{str(data)}
 
-                Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO. No añadas explicación. Responde solo con la categoría."""
+Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO. No añadas explicación. Responde solo con la categoría."""
             try:
                 ollama_resp = requests.post(
                     OLLAMA_URL,
@@ -209,20 +210,28 @@ def submit_log_manual():
                 ollama_resp.raise_for_status()
                 result = ollama_resp.json().get("response", "").strip()
                 data["ollama_diagnosis"] = result
+
+                # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
+                risk_level = result.split()[0].upper()
+                if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
+                    risk_level = "DESCONOCIDO"
+
             except Exception as e:
                 result = f"Error llamando a Ollama: {str(e)}"
                 data["ollama_diagnosis"] = result
+                risk_level = "ERROR"
 
             # Guardar en Elasticsearch
             requests.post(ELASTIC_URL, json=data)
 
         except Exception as e:
             result = f"Error procesando el log: {str(e)}"
+            risk_level = "ERROR"
 
-    return render_template("submit_log.html", result=result, log_data=log_data)
+    return render_template("submit_log.html", result=result, log_data=log_data, risk_level=risk_level)
 
 
-# ruta válida para el envío desde servidores, agregando token jwt en la cabecera
+
 @app.route('/api/logs', methods=['POST'])
 def api_receive_log():
     auth_header = request.headers.get('Authorization', '')
@@ -238,13 +247,14 @@ def api_receive_log():
     data = request.get_json()
     log_text = str(data)  # Convertimos el dict completo a string para analizar
 
-    # Enviar el log a Ollama
+    # Preparar el prompt para Ollama
     prompt = f"""Analiza este log de ciberseguridad:
 
-        {log_text}
+{log_text}
 
-        Devuélveme únicamente una de estas categorías de riesgo: CRÍTICO, ALTO, MEDIO, BAJO. 
-        No añadas explicación. Responde solo con la categoría."""
+Devuélveme únicamente una de estas categorías de riesgo: CRÍTICO, ALTO, MEDIO, BAJO. 
+No añadas explicación. Responde solo con la categoría."""
+    
     try:
         ollama_resp = requests.post(
             OLLAMA_URL,
@@ -258,24 +268,35 @@ def api_receive_log():
         ollama_resp.raise_for_status()
         response_text = ollama_resp.json().get("response", "").strip()
         print(f"[Ollama → Análisis]: {response_text}")
+
+        # Extraer criticidad del texto devuelto
+        risk_level = response_text.split()[0].upper()
+        if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
+            risk_level = "DESCONOCIDO"
+
     except Exception as e:
         print(f"[ERROR → Ollama]: {e}")
         response_text = "Error al analizar con Ollama"
+        risk_level = "ERROR"
 
-    # Añadir metainformación al log y enviarlo a Elasticsearch
+    # Añadir metadatos
     data['received_at'] = datetime.now(timezone.utc).isoformat()
     data['submitted_by'] = data_decoded.get("username")
-    data['ollama_diagnosis'] = response_text  # (opcional) guardar respuesta de Ollama en Elasticsearch
+    data['ollama_diagnosis'] = response_text
+    data['risk_level'] = risk_level
 
     try:
         es_resp = requests.post(ELASTIC_URL, json=data)
         es_resp.raise_for_status()
         return jsonify({
             "message": "Log recibido",
-            "es_id": es_resp.json()["_id"]
+            "es_id": es_resp.json()["_id"],
+            "diagnosis": response_text,
+            "risk_level": risk_level
         }), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 def init_db():

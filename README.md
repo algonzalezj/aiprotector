@@ -31,7 +31,7 @@ source venv/bin/activate  # Linux o MacOS
 
 ### Instalar dependencias
 ```bash
-pip install -r ../requirements.txt
+pip install -r requirements.txt
 ```
 
 ### Ejecutar la aplicación
