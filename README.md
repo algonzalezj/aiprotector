@@ -52,6 +52,40 @@ Acceder a ollama : `http://localhost:11434`
 - AdminLTE
 - Ollama
 
+## Crear bot de telegram para avisos
+1. Crear un bot con @BotFather en Telegram:
+
+    En Telegram, busca @BotFather
+    Manda /start y luego /newbot
+    Ponle un nombre y un username único.
+    Te dará un TOKEN, guárdalo.
+
+2. Obtener tu chat_id personal:
+
+Abre esta URL en tu navegador (reemplaza BOT_TOKEN):
+
+https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
+
+Mándale un mensaje al bot, vuelve a visitar la URL, y en la respuesta JSON busca tu chat.id. Por ejemplo:
+
+"chat": {
+  "id": 123456789,
+  "first_name": "usuario",
+  ...
+}
+
+Ese número es tu chat_id.
+3. Agrega estos datos a tu .env:
+
+TELEGRAM_TOKEN=123456789:ABCDEF...tu_token
+TELEGRAM_CHAT_ID=123456789
+
+4. En tu app.py, carga estas variables:
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+
 ## Contribuir
 ¡Las contribuciones son bienvenidas!
 

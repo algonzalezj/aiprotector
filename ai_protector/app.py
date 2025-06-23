@@ -13,6 +13,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 ELASTIC_URL = os.getenv('ELASTIC_URL')
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 app.secret_key = SECRET_KEY  # 🔐 Necesario para flash, sesiones, etc.
 
 def get_db():
@@ -38,6 +40,23 @@ def get_user_from_token():
         return None
     data = decode_token(token)
     return data.get('username') if data else None
+
+def notify_telegram(message):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[Telegram] Token o chat_id no configurado.")
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"[Telegram ERROR] {e}")
 
 @app.route('/')
 def index():
@@ -216,6 +235,8 @@ Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BA
                 risk_level = result.split()[0].upper()
                 if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
                     risk_level = "DESCONOCIDO"
+                if risk_level == "CRÍTICO":
+                    notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nMensaje: {data.get('message')}")
 
             except Exception as e:
                 result = f"Error llamando a Ollama: {str(e)}"
@@ -274,6 +295,8 @@ No añadas explicación. Responde solo con la categoría."""
         risk_level = response_text.split()[0].upper()
         if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
             risk_level = "DESCONOCIDO"
+        if risk_level == "CRÍTICO":
+            notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nMensaje: {data.get('message')}")
 
     except Exception as e:
         print(f"[ERROR → Ollama]: {e}")
