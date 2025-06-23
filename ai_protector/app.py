@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, make_response, jsonify, flash
 import sqlite3
 import jwt
 import requests
@@ -13,6 +13,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 ELASTIC_URL = os.getenv('ELASTIC_URL')
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
+app.secret_key = SECRET_KEY  # 🔐 Necesario para flash, sesiones, etc.
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
