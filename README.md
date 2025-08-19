@@ -20,6 +20,27 @@ cd ai_protector
 ```bash
 docker compose up -d elasticsearch kibana ollama sqlite
 ```
+
+### Instalar LLMs
+Recomendado	        Para qué usarlo
+llama3              Análisis general de logs, buena comprensión de lenguaje.
+mistral             Uso rápido, poco consumo, tareas livianas.
+codellama:instruct	Cuando quieras analizar logs de servidores, scripts o errores técnicos.
+phi3	              Alternativa compacta, buen rendimiento, especialmente para clasificación.
+```bash
+docker exec -it ollama ollama list
+docker exec -it ollama bash
+
+ollama pull llama3
+ollama pull mistral
+ollama pull codellama:instruct
+ollama pull phi3
+```
+Para listar los modelos desde el api de ollama
+```bash
+curl http://localhost:11434/api/tags
+```
+
 SOLO PARA DEVS
 
 ### Crear entorno virtual

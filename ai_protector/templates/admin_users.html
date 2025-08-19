@@ -21,30 +21,51 @@
       </select>
     </div>
     <div class="col">
+      <select name="preferred_model" class="form-control" required>
+        <option value="llama3">llama3</option>
+        <option value="mistral">mistral</option>
+        <option value="codellama:instruct">codellama:instruct</option>
+        <option value="phi3">phi3</option>
+        <!-- Añade más si tienes otros modelos descargados -->
+      </select>
+    </div>
+    <div class="col">
       <button type="submit" class="btn btn-success">Crear</button>
     </div>
   </div>
 </form>
 
+
 <table class="table table-bordered">
   <thead>
-    <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr>
+    <tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Modelo</th><th>Acciones</th></tr>
   </thead>
   <tbody>
     {% for u in users %}
       <tr>
-        <td>{{ u[0] }}</td>
-        <td>{{ u[1] }}</td>
-        <td>{{ u[2] }}</td>
-        <td>
-          {% if u[1] != username %}
-          <form method="POST" action="{{ url_for('delete_user', user_id=u[0]) }}">
-            <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar este usuario?')">Eliminar</button>
-          </form>
-          {% else %}
-          <em>Actual</em>
-          {% endif %}
-        </td>
+        <form method="POST" action="{{ url_for('update_model', user_id=u[0]) }}">
+          <td>{{ u[0] }}</td>
+          <td>{{ u[1] }}</td>
+          <td>{{ u[2] }}</td>
+          <td>
+            <select name="preferred_model" class="form-control">
+              <option value="llama3" {% if u[3] == 'llama3' %}selected{% endif %}>llama3</option>
+              <option value="mistral" {% if u[3] == 'mistral' %}selected{% endif %}>mistral</option>
+              <option value="codellama:instruct" {% if u[3] == 'codellama:instruct' %}selected{% endif %}>codellama:instruct</option>
+              <option value="phi3" {% if u[3] == 'phi3' %}selected{% endif %}>phi3</option>
+            </select>
+          </td>
+          <td class="d-flex">
+            {% if u[1] != username %}
+              <button class="btn btn-primary btn-sm mr-2" type="submit">Actualizar</button>
+              <form method="POST" action="{{ url_for('delete_user', user_id=u[0]) }}">
+                <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar este usuario?')">Eliminar</button>
+              </form>
+            {% else %}
+              <button class="btn btn-primary btn-sm mr-2" type="submit">Actualizar</button>
+            {% endif %}
+          </td>
+        </form>
       </tr>
     {% endfor %}
   </tbody>

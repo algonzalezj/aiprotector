@@ -2,7 +2,7 @@ Si necesitas acceder al sqlite por terminal:
 
     - docker exec -it sqlite-db sqlite3 /root/db/app.db
 
-Para ver los docjer arrancados:
+Para ver los docker arrancados:
     - docker ps
 
 Para ver elasticsearch arrancado:
@@ -58,7 +58,6 @@ curl -X POST http://localhost:5000/api/logs \
 }'
 
 MENSAJE BAJO
-
 curl -X POST http://localhost:5000/api/logs \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \

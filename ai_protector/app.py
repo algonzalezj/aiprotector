@@ -141,7 +141,7 @@ def manage_users():
     if c.fetchone()[0] != 'admin':
         return "Acceso denegado", 403
 
-    c.execute("SELECT id, username, role FROM users")
+    c.execute("SELECT id, username, role, preferred_model FROM users")
     users = c.fetchall()
     conn.close()
     return render_template('admin_users.html', username=current_user, users=users)
@@ -156,13 +156,14 @@ def add_user():
     username = request.form['username']
     password = request.form['password']
     role = request.form['role']
+    preferred_model = request.form['preferred_model']
     hashed = generate_password_hash(password)
 
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                  (username, hashed, role))
+        c.execute("INSERT INTO users (username, password, role, preferred_model) VALUES (?, ?, ?, ?)",
+                  (username, hashed, role, preferred_model))
         conn.commit()
         conn.close()
         flash("Usuario creado correctamente", "success")
@@ -187,6 +188,24 @@ def delete_user(user_id):
 
     return redirect(url_for('manage_users'))
 
+#Editar modelo usuario
+@app.route('/admin/users/update_model/<int:user_id>', methods=['POST'])
+def update_model(user_id):
+    current_user = get_user_from_token()
+    if not current_user:
+        return redirect(url_for('login'))
+
+    preferred_model = request.form.get('preferred_model')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE users SET preferred_model = ? WHERE id = ?", (preferred_model, user_id))
+    conn.commit()
+    conn.close()
+
+    flash("Modelo actualizado correctamente", "success")
+    return redirect(url_for('manage_users'))
+
 
 @app.route('/logout')
 def logout():
@@ -204,14 +223,23 @@ def submit_log_manual():
     log_data = ""
     risk_level = "DESCONOCIDO"
 
+    # Obtener modelo actual del usuario
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT preferred_model FROM users WHERE username=?", (username,))
+    row = c.fetchone()
+    conn.close()
+    model_actual = row[0] if row else OLLAMA_MODEL
+
     if request.method == 'POST':
         try:
             log_data = request.form['log']
             data = eval(log_data)  # ⚠️ Sustituye por json.loads() en producción
             data['received_at'] = datetime.now(timezone.utc).isoformat()
             data['submitted_by'] = username
+            data['server_ip'] = request.remote_addr  # 🔍 IP de quien envía el log (servidor cliente)
 
-            # Llamada a Ollama
+            # Llamada a Ollama con modelo personalizado
             prompt = f"""Evalúa el siguiente log de ciberseguridad:
 
 {str(data)}
@@ -221,7 +249,7 @@ Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BA
                 ollama_resp = requests.post(
                     OLLAMA_URL,
                     json={
-                        "model": OLLAMA_MODEL,
+                        "model": model_actual,
                         "prompt": prompt,
                         "stream": False
                     },
@@ -230,13 +258,14 @@ Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BA
                 ollama_resp.raise_for_status()
                 result = ollama_resp.json().get("response", "").strip()
                 data["ollama_diagnosis"] = result
+                data['model'] = model_actual
 
                 # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
                 risk_level = result.split()[0].upper()
                 if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
                     risk_level = "DESCONOCIDO"
                 if risk_level == "CRÍTICO":
-                    notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nMensaje: {data.get('message')}")
+                    notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nModeloIA: {model_actual}\nMensaje: {data.get('message')}")
 
             except Exception as e:
                 result = f"Error llamando a Ollama: {str(e)}"
@@ -250,8 +279,7 @@ Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BA
             result = f"Error procesando el log: {str(e)}"
             risk_level = "ERROR"
 
-    return render_template("submit_log.html", result=result, log_data=log_data, risk_level=risk_level)
-
+    return render_template("submit_log.html", result=result, log_data=log_data, risk_level=risk_level, model_actual=model_actual)
 
 
 @app.route('/api/logs', methods=['POST'])
@@ -269,6 +297,14 @@ def api_receive_log():
     data = request.get_json()
     log_text = str(data)  # Convertimos el dict completo a string para analizar
 
+    # 🔍 Obtener modelo preferido del usuario
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT preferred_model FROM users WHERE username=?", (data_decoded.get("username"),))
+    row = c.fetchone()
+    conn.close()
+    ollama_model = row[0] if row else OLLAMA_MODEL
+
     # Preparar el prompt para Ollama
     prompt = f"""Analiza este log de ciberseguridad:
 
@@ -281,7 +317,7 @@ No añadas explicación. Responde solo con la categoría."""
         ollama_resp = requests.post(
             OLLAMA_URL,
             json={
-                "model": OLLAMA_MODEL,
+                "model": ollama_model,
                 "prompt": prompt,
                 "stream": False
             },
@@ -296,7 +332,7 @@ No añadas explicación. Responde solo con la categoría."""
         if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
             risk_level = "DESCONOCIDO"
         if risk_level == "CRÍTICO":
-            notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nMensaje: {data.get('message')}")
+            notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nModeloIA: {ollama_model}\nMensaje: {data.get('message')}")
 
     except Exception as e:
         print(f"[ERROR → Ollama]: {e}")
@@ -306,9 +342,11 @@ No añadas explicación. Responde solo con la categoría."""
     # Añadir metadatos
     data['received_at'] = datetime.now(timezone.utc).isoformat()
     data['submitted_by'] = data_decoded.get("username")
+    data['server_ip'] = request.remote_addr  # 🔍 IP de quien envía el log (servidor cliente)
     data['ollama_diagnosis'] = response_text
     data['risk_level'] = risk_level
-
+    data['model'] = ollama_model
+    print(f"[TRACE] Log recibido desde servidor IP: {data['server_ip']}")
     try:
         es_resp = requests.post(ELASTIC_URL, json=data)
         es_resp.raise_for_status()
@@ -316,7 +354,8 @@ No añadas explicación. Responde solo con la categoría."""
             "message": "Log recibido",
             "es_id": es_resp.json()["_id"],
             "diagnosis": response_text,
-            "risk_level": risk_level
+            "risk_level": risk_level,
+            "model": ollama_model
         }), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -331,9 +370,11 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT NOT NULL CHECK(role IN ('admin', 'user', 'server'))
+            role TEXT NOT NULL CHECK(role IN ('admin', 'user', 'server')),
+            preferred_model TEXT NOT NULL DEFAULT 'llama3'
         )
     """)
+    
     conn.commit()
     conn.close()
 
