@@ -55,7 +55,7 @@
               <option value="phi3" {% if u[3] == 'phi3' %}selected{% endif %}>phi3</option>
             </select>
           </td>
-          <td class="d-flex">
+          <td class="">
             {% if u[1] != username %}
               <button class="btn btn-primary btn-sm mr-2" type="submit">Actualizar</button>
               <form method="POST" action="{{ url_for('delete_user', user_id=u[0]) }}">
