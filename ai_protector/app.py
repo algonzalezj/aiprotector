@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, make_respo
 import sqlite3
 import jwt
 import requests
+import json
 import re # Necesario para buscar
 from dotenv import load_dotenv
 import os
@@ -60,53 +61,68 @@ def notify_telegram(message):
         print(f"[Telegram ERROR] {e}")
 
 def get_knowledge_base():
-    """Carga toda la base de conocimiento desde la tabla de SQLite."""
+    """
+    Carga la base de conocimiento desde la tabla de SQLite,
+    incluyendo las nuevas columnas.
+    """
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT name, description, risk FROM knowledge_base")
-    # Usa un diccionario para una búsqueda más eficiente por nombre de vulnerabilidad
-    knowledge_data = [{"name": row[0], "description": row[1], "risk": row[2]} for row in c.fetchall()]
+    c.execute("SELECT name, description, risk, attack_signatures, mitigation_steps FROM knowledge_base")
+    knowledge_data = []
+    for row in c.fetchall():
+        try:
+            # 🕵️‍♂️ Decodifica el JSON de las firmas de ataque
+            signatures = json.loads(row[3])
+        except (json.JSONDecodeError, TypeError):
+            signatures = []
+        
+        knowledge_data.append({
+            "name": row[0],
+            "description": row[1],
+            "risk": row[2],
+            "attack_signatures": signatures,
+            "mitigation_steps": row[4]
+        })
     conn.close()
     return knowledge_data
 
-def retrieve_context(log_text, knowledge_base):
+def retrieve_context(log_message, knowledge_base):
     """
-    Busca en la base de datos de conocimiento las palabras clave relevantes
-    y devuelve los fragmentos únicos.
+    Busca coincidencias en la base de conocimiento con el mensaje del log,
+    utilizando las firmas de ataque.
     """
-    relevant_chunks = []
-    log_text_lower = log_text.lower()
+    print("-" * 50)
+    print(">>> Iniciando el proceso de RAG")
+    print(f">>> Log de texto a analizar: '{log_message}'")
     
-    # 🕵️‍♂️ NUEVO: Usamos un conjunto para almacenar nombres de entradas ya encontradas
-    found_entries = set()
+    retrieved_info = []
+    log_message_lower = log_message.lower()
     
+    # 🔍 Itera sobre cada entrada de la base de conocimiento
     for entry in knowledge_base:
-        # Si esta entrada ya ha sido añadida, la saltamos para evitar duplicados.
-        if entry['name'] in found_entries:
-            continue
-            
-        # Crea una lista de palabras clave a partir del nombre de la entrada
-        # Ejemplo: 'CVE-2017-0144 (EternalBlue)' -> ['cve', '2017', '0144', 'eternalblue']
-        keywords = re.findall(r'\b\w+\b', entry['name'].lower())
-        
-        # Busca cada palabra clave individualmente en el log
-        for keyword in keywords:
-            # Filtra palabras clave cortas o no relevantes
-            if len(keyword) < 4:
-                continue
-
-            # Busca coincidencias de palabras completas
-            if re.search(r'\b' + re.escape(keyword) + r'\b', log_text_lower):
-                # Añade la información al chunk
-                relevant_chunks.append(f"Información adicional sobre '{entry['name']}': {entry['description']}")
-                
-                # 🕵️‍♂️ NUEVO: Añade el nombre de la entrada al conjunto de encontrados
-                found_entries.add(entry['name'])
-                
-                # Sale del bucle interior para pasar a la siguiente entrada de la base de conocimiento
-                break 
+        # 🔍 Comprueba si alguna de las firmas de ataque está en el mensaje del log
+        for signature in entry.get("attack_signatures", []):
+            # 🕵️‍♂️ Convertimos todo a minúsculas para una búsqueda sin distinción de mayúsculas y minúsculas
+            if signature.lower() in log_message_lower:
+                # ✍️ Si se encuentra una firma, formatea la información relevante
+                context = (
+                    f"Vulnerabilidad Detectada: {entry.get('name', 'Desconocida')}\n"
+                    f"Descripción: {entry.get('description', 'N/A')}\n"
+                    f"Riesgo: {entry.get('risk', 'N/A')}\n"
+                    f"Pasos de Mitigación: {entry.get('mitigation_steps', 'N/A')}"
+                )
+                retrieved_info.append(context)
+                # ➡️ Sal del bucle de firmas una vez que se encuentre una coincidencia
+                break
     
-    return "\n".join(relevant_chunks)
+    print(">>> Depuración de RAG finalizada.")
+    print("-" * 50)
+    
+    # ➡️ Devuelve la información formateada o un mensaje predeterminado
+    if retrieved_info:
+        return "\n\n".join(retrieved_info)
+    else:
+        return "No se encontró información adicional relevante en la base de conocimiento para este log."
 
 @app.route('/')
 def index():
@@ -275,6 +291,7 @@ def submit_log_manual():
     result = None
     log_data = ""
     risk_level = "DESCONOCIDO"
+    rag_enabled_status = True
 
     # Obtener modelo actual del usuario
     conn = get_db()
@@ -287,14 +304,24 @@ def submit_log_manual():
     if request.method == 'POST':
         try:
             log_data = request.form['log']
-            data = eval(log_data)  # ⚠️ Sustituir por json.loads() en producción
+            rag_enabled_status = 'rag_enabled' in request.form
+
+            # ⚠️ Sustituir por json.loads() en producción
+            # He usado json.loads aquí para hacer el código más robusto,
+            # pero considera que eval() es peligroso en producción.
+            data = json.loads(log_data)
             data['received_at'] = datetime.now(timezone.utc).isoformat()
             data['submitted_by'] = username
             data['server_ip'] = request.remote_addr  # 🔍 IP de quien envía el log (servidor cliente)
 
             #  Cargar la base de conocimiento y recuperar el contexto
-            knowledge_base = get_knowledge_base()
-            retrieved_info = retrieve_context(str(data), knowledge_base)
+            retrieved_info = ""
+            # 🕵️‍♂️ CONDICIONAL RAG: SOLO SE BUSCA EL CONTEXTO SI ESTÁ ACTIVADO
+            if rag_enabled_status:
+                knowledge_base = get_knowledge_base()
+                # 🕵️‍♂️ CORRECCIÓN: Pasar solo el campo 'message' del log a la función RAG
+                log_message = data.get('message', '')
+                retrieved_info = retrieve_context(log_message, knowledge_base)
 
             # Llamada a Ollama con modelo personalizado
             prompt = f"""Evalúa el siguiente log de ciberseguridad:
@@ -306,7 +333,14 @@ Información adicional relevante de nuestra base de conocimiento:
 {retrieved_info if retrieved_info else 'No se encontró información adicional.'}
 ---
 
-Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BAJO. No añadas explicación. Responde solo con la categoría."""
+Evalúa el log y la información relevante para emitir un diagnóstico de seguridad.
+
+Si la información adicional te ayuda a llegar a tu conclusión, explica brevemente cómo la usaste en tu razonamiento y si lo usaste o no.
+
+Responde exclusivamente en formato JSON con dos campos:
+"risk_level": la categoría de riesgo, que debe ser una de las siguientes: CRÍTICO, ALTO, MEDIO o BAJO.
+"reasoning": una breve explicación (máximo 2-3 frases) de por qué se asignó esa categoría y si usaste la información adicional o no.
+"""
             
             # 🕵️‍♂️ TRAZAS DE LA LLAMADA A OLLAMA
             print("-" * 50)
@@ -320,47 +354,68 @@ Responde exclusivamente con una de estas categorías: CRÍTICO, ALTO, MEDIO o BA
                     json={
                         "model": model_actual,
                         "prompt": prompt,
-                        "stream": False
+                        "stream": False,
+                        "format": "json"  # <-- Solicita una respuesta en formato JSON
                     },
                     timeout=30
                 )
                 ollama_resp.raise_for_status()
-                response_json = ollama_resp.json()
-                result = response_json.get("response", "").strip()
-
+                
+                # Manejar la respuesta. La respuesta de Ollama puede llegar como una cadena si no hay JSON
+                response_text = ollama_resp.json().get("response", "").strip()
+                
+                # Intentar parsear el JSON
+                try:
+                    result = json.loads(response_text)
+                except json.JSONDecodeError as json_e:
+                    # Si falla el parseo, creamos un resultado de error
+                    result = {
+                        "risk_level": "ERROR",
+                        "reasoning": f"Error al decodificar la respuesta JSON de Ollama: {str(json_e)}. Respuesta recibida: '{response_text}'"
+                    }
+                
                 # 🕵️‍♂️ TRAZA DE LA RESPUESTA DE OLLAMA
                 print("-" * 50)
                 print("[OLLAMA TRACE] Respuesta recibida:")
-                print(f"Modelo: {response_json.get('model')}")
-                print(f"Diagnóstico: {result}")
-                print(f"Token de diagnóstico: {response_json.get('total_duration')}") # O cualquier otro token de diagnóstico
+                # Usar .get() con un valor por defecto para evitar errores si las claves no existen
+                print(f"Diagnóstico: {result.get('risk_level', 'No disponible')}")
+                print(f"Razonamiento: {result.get('reasoning', 'No disponible')}")
+                print(f"Token de diagnóstico: {ollama_resp.json().get('total_duration', 'No disponible')}")
                 print("-" * 50)
-
-                data["ollama_diagnosis"] = result
+                
+                # Verificar si result es un diccionario antes de intentar acceder a sus claves
+                if isinstance(result, dict):
+                    data["ollama_diagnosis"] = result.get('risk_level')
+                    data["ollama_reasoning"] = result.get('reasoning')
+                else:
+                    data["ollama_diagnosis"] = "ERROR"
+                    data["ollama_reasoning"] = "Respuesta inesperada de Ollama"
+                
                 data['model'] = model_actual
 
                 # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
-                risk_level = result.split()[0].upper()
+                risk_level = data.get('ollama_diagnosis', '').upper()
                 if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
                     risk_level = "DESCONOCIDO"
                 if risk_level == "CRÍTICO":
                     notify_telegram(f"🚨 *Alerta crítica detectada* 🚨\nIP: {data.get('source_ip')}\nServicio: {data.get('service')}\nModeloIA: {model_actual}\nMensaje: {data.get('message')}")
 
             except Exception as e:
-                result = f"Error llamando a Ollama: {str(e)}"
-                data["ollama_diagnosis"] = result
+                # Capturar cualquier otro error en la llamada a Ollama
+                result = {"risk_level": "ERROR", "reasoning": f"Error llamando a Ollama: {str(e)}"}
                 risk_level = "ERROR"
 
             # Guardar en Elasticsearch
             requests.post(ELASTIC_URL, json=data)
 
         except Exception as e:
-            result = f"Error procesando el log: {str(e)}"
+            # Capturar errores en el procesamiento del log
+            result = {"risk_level": "ERROR", "reasoning": f"Error procesando el log: {str(e)}"}
             risk_level = "ERROR"
-
+    
     return render_template("submit_log.html", result=result, log_data=log_data, risk_level=risk_level, model_actual=model_actual)
 
-# REST de consulta de logs externa
+
 @app.route('/api/logs', methods=['POST'])
 def api_receive_log():
     auth_header = request.headers.get('Authorization', '')
@@ -386,20 +441,28 @@ def api_receive_log():
 
     # 🕵️‍♂️ NUEVO: RAG - Cargar la base de conocimiento y obtener el contexto
     knowledge_base = get_knowledge_base()
-    retrieved_info = retrieve_context(log_text, knowledge_base)
+    # 🕵️‍♂️ Corregido para usar solo el campo 'message' del log para la búsqueda RAG
+    log_message = data.get('message', '')
+    retrieved_info = retrieve_context(log_message, knowledge_base)
 
     # Preparar el prompt para Ollama
-    prompt = f"""Analiza este log de ciberseguridad:
+    prompt = f"""Evalúa el siguiente log de ciberseguridad:
 
-{log_text}
+{str(data)}
 
 ---
 Información adicional relevante de nuestra base de conocimiento:
 {retrieved_info if retrieved_info else 'No se encontró información adicional.'}
 ---
 
-Devuélveme únicamente una de estas categorías de riesgo: CRÍTICO, ALTO, MEDIO, BAJO. 
-No añadas explicación. Responde solo con la categoría."""
+Evalúa el log y la información relevante para emitir un diagnóstico de seguridad.
+
+Si la información adicional te ayuda a llegar a tu conclusión, explica brevemente cómo la usaste en tu razonamiento y si lo usaste o no.
+
+Responde exclusivamente en formato JSON con dos campos:
+"risk_level": la categoría de riesgo, que debe ser una de las siguientes: CRÍTICO, ALTO, MEDIO o BAJO.
+"reasoning": una breve explicación (máximo 2-3 frases) de por qué se asignó esa categoría y si usaste la información adicional o no.
+"""
     
     try:
         ollama_resp = requests.post(
@@ -407,16 +470,45 @@ No añadas explicación. Responde solo con la categoría."""
             json={
                 "model": ollama_model,
                 "prompt": prompt,
-                "stream": False
+                "stream": False,
+                "format": "json"  # <-- Solicita una respuesta en formato JSON
             },
             timeout=60
         )
         ollama_resp.raise_for_status()
         response_text = ollama_resp.json().get("response", "").strip()
-        print(f"[Ollama → Análisis]: {response_text}")
 
-        # Extraer criticidad del texto devuelto
-        risk_level = response_text.split()[0].upper()
+        # Manejar la respuesta. La respuesta de Ollama puede llegar como una cadena si no hay JSON
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as json_e:
+            # Si falla el parseo, creamos un resultado de error
+            result = {
+                "risk_level": "ERROR",
+                "reasoning": f"Error al decodificar la respuesta JSON de Ollama: {str(json_e)}. Respuesta recibida: '{response_text}'"
+            }
+        
+        # 🕵️‍♂️ TRAZA DE LA RESPUESTA DE OLLAMA
+        print("-" * 50)
+        print("[OLLAMA TRACE] Respuesta recibida:")
+        # Usar .get() con un valor por defecto para evitar errores si las claves no existen
+        print(f"Diagnóstico: {result.get('risk_level', 'No disponible')}")
+        print(f"Razonamiento: {result.get('reasoning', 'No disponible')}")
+        print(f"Token de diagnóstico: {ollama_resp.json().get('total_duration', 'No disponible')}")
+        print("-" * 50)
+
+        # Verificar si result es un diccionario antes de intentar acceder a sus claves
+        if isinstance(result, dict):
+            data["ollama_diagnosis"] = result.get('risk_level')
+            data["ollama_reasoning"] = result.get('reasoning')
+        else:
+            data["ollama_diagnosis"] = "ERROR"
+            data["ollama_reasoning"] = "Respuesta inesperada de Ollama"
+
+        data['model'] = model_actual    
+        
+        # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
+        risk_level = data.get('ollama_diagnosis', '').upper()
         if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
             risk_level = "DESCONOCIDO"
         if risk_level == "CRÍTICO":
@@ -424,14 +516,15 @@ No añadas explicación. Responde solo con la categoría."""
 
     except Exception as e:
         print(f"[ERROR → Ollama]: {e}")
-        response_text = "Error al analizar con Ollama"
+        result = {"risk_level": "ERROR", "reasoning": f"Error al analizar con Ollama: {str(e)}"}
         risk_level = "ERROR"
 
     # Añadir metadatos
     data['received_at'] = datetime.now(timezone.utc).isoformat()
     data['submitted_by'] = data_decoded.get("username")
     data['server_ip'] = request.remote_addr  # 🔍 IP de quien envía el log (servidor cliente)
-    data['ollama_diagnosis'] = response_text
+    data['ollama_diagnosis'] = result.get('risk_level')
+    data['ollama_reasoning'] = result.get('reasoning')
     data['risk_level'] = risk_level
     data['model'] = ollama_model
     print(f"[TRACE] Log recibido desde servidor IP: {data['server_ip']}")
@@ -441,7 +534,8 @@ No añadas explicación. Responde solo con la categoría."""
         return jsonify({
             "message": "Log recibido",
             "es_id": es_resp.json()["_id"],
-            "diagnosis": response_text,
+            "diagnosis": result.get('risk_level'),
+            "reasoning": result.get('reasoning'),
             "risk_level": risk_level,
             "model": ollama_model
         }), 201
@@ -464,42 +558,46 @@ def init_db():
         )
     """)
     
-    # Tabla de la base de conocimiento (RAG)
+    # ⚠️ Modificación del esquema de la tabla de conocimiento
+    # Primero se elimina la tabla para recrearla con las nuevas columnas
+    c.execute("DROP TABLE IF EXISTS knowledge_base")
+
     c.execute("""
-        CREATE TABLE IF NOT EXISTS knowledge_base (
+        CREATE TABLE knowledge_base (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             description TEXT NOT NULL,
-            risk TEXT NOT NULL
+            risk TEXT NOT NULL,
+            attack_signatures TEXT,
+            mitigation_steps TEXT
         )
     """)
     
-    # Inserts de datos para la base de conocimiento
-    # Se intentan insertar, pero si ya existen, no se produce error gracias al control try-except
+    # 🕵️‍♂️ Inserts de datos para la base de conocimiento (con firmas de ataque)
     try:
         # Vulnerabilidades comunes y ataques
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('SQL Injection', 'Vulnerabilidad donde un atacante inserta código SQL malicioso para filtrar datos o bypassar la autenticación.', 'ALTO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Cross-Site Scripting (XSS)', 'Permite a un atacante ejecutar scripts en el navegador de los usuarios para robar información.', 'MEDIO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Buffer Overflow', 'Ataque que sobreescribe un buffer de memoria, causando un fallo o la ejecución de código arbitrario.', 'CRÍTICO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Denial of Service (DoS)', 'Un ataque que inunda un servicio o red con tráfico ilegítimo para hacerlo inaccesible.', 'ALTO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Ransomware', 'Malware que encripta los archivos de la víctima y exige un rescate a cambio de la clave de descifrado.', 'CRÍTICO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Phishing', 'Intento de engañar a los usuarios para que revelen información sensible, como contraseñas, haciéndose pasar por una entidad legítima.', 'MEDIO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)", 
-                  ('Man-in-the-Middle (MitM)', 'Ataque donde el atacante se sitúa entre dos partes que se comunican, interceptando y alterando la comunicación.', 'ALTO'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('SQL Injection', 'Vulnerabilidad donde un atacante inserta código SQL malicioso para filtrar datos o bypassar la autenticación.', 'ALTO', json.dumps(['union select', "' or '1'='1", "1' or '1'='1", "sleep("]), 'Utilizar sentencias preparadas (Prepared Statements) o ORMs para parametrizar las consultas.'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Cross-Site Scripting (XSS)', 'Permite a un atacante ejecutar scripts en el navegador de los usuarios para robar información.', 'MEDIO', json.dumps(['<script>', 'alert(', 'prompt(', 'confirm(', 'onerror=']), 'Sanear y validar todas las entradas de usuario y utilizar una política de seguridad de contenido (CSP).'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Buffer Overflow', 'Ataque que sobreescribe un buffer de memoria, causando un fallo o la ejecución de código arbitrario.', 'CRÍTICO', json.dumps(['segmentation fault', 'stack overflow', 'buffer overflow']), 'Utilizar lenguajes de programación con protección de memoria (Rust, Go) o funciones seguras para manejo de cadenas (strlcpy en lugar de strcpy).'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Denial of Service (DoS)', 'Un ataque que inunda un servicio o red con tráfico ilegítimo para hacerlo inaccesible.', 'ALTO', json.dumps(['Too many requests', 'Connection refused', 'timeout error', 'service unavailable']), 'Implementar limitación de tasa (rate limiting) y sistemas de detección de intrusiones (IDS).'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Ransomware', 'Malware que encripta los archivos de la víctima y exige un rescate a cambio de la clave de descifrado.', 'CRÍTICO', json.dumps(['.crypt', '.locky', '.cerber']), 'Mantener copias de seguridad de los datos, usar software antivirus y educar a los usuarios.'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Phishing', 'Intento de engañar a los usuarios para que revelen información sensible, como contraseñas, haciéndose pasar por una entidad legítima.', 'MEDIO', json.dumps(['Suspicious link', 'please click here', 'password reset', 'security alert']), 'Capacitación en seguridad y uso de autenticación multifactor (MFA).'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)", 
+                  ('Man-in-the-Middle (MitM)', 'Ataque donde el atacante se sitúa entre dos partes que se comunican, interceptando y alterando la comunicación.', 'ALTO', json.dumps(['http:', 'untrusted certificate', 'certificate error']), 'Utilizar HTTPS con TLS/SSL para toda la comunicación.'))
 
         # Ejemplos de CVEs
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)",
-                  ('CVE-2021-44228 (Log4j)', 'Una vulnerabilidad de ejecución remota de código (RCE) en la popular biblioteca de Java Apache Log4j.', 'CRÍTICO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)",
-                  ('CVE-2014-0160 (Heartbleed)', 'Vulnerabilidad grave en la biblioteca de criptografía OpenSSL que permitía a los atacantes robar información sensible.', 'ALTO'))
-        c.execute("INSERT INTO knowledge_base (name, description, risk) VALUES (?, ?, ?)",
-                  ('CVE-2017-0144 (EternalBlue)', 'Un exploit de la NSA que permite a un atacante ejecutar código malicioso de forma remota en sistemas Windows. Utilizado por el ransomware WannaCry.', 'CRÍTICO'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)",
+                  ('CVE-2021-44228 (Log4j)', 'Una vulnerabilidad de ejecución remota de código (RCE) en la popular biblioteca de Java Apache Log4j.', 'CRÍTICO', json.dumps(['jndi:ldap:', 'jndi:rmi:', 'jndi:dns:', 'jndi:iiop:', 'jndi:corba:']), 'Actualizar a la versión 2.17.1 de Apache Log4j2 o posterior. Si no es posible, establecer la propiedad de sistema "log4j2.formatMsgNoLookups" a "true".'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)",
+                  ('CVE-2014-0160 (Heartbleed)', 'Vulnerabilidad grave en la biblioteca de criptografía OpenSSL que permitía a los atacantes robar información sensible.', 'ALTO', json.dumps(['heartbeat extension', 'heartbeat request']), 'Actualizar OpenSSL a la versión 1.0.1g o posterior.'))
+        c.execute("INSERT INTO knowledge_base (name, description, risk, attack_signatures, mitigation_steps) VALUES (?, ?, ?, ?, ?)",
+                  ('CVE-2017-0144 (EternalBlue)', 'Un exploit de la NSA que permite a un atacante ejecutar código malicioso de forma remota en sistemas Windows. Utilizado por el ransomware WannaCry.', 'CRÍTICO', json.dumps(['SMBv1 exploit', 'ETERNALBLUE', 'MS17-010']), 'Deshabilitar SMBv1 y aplicar el parche de seguridad de Microsoft (MS17-010).'))
         
         conn.commit()
     except sqlite3.IntegrityError:
