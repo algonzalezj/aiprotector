@@ -3,3 +3,4 @@
 ai_protector/data/app.db
 .env
 venv
+.vscode/launch.json
