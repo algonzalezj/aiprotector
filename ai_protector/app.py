@@ -3,11 +3,14 @@ import sqlite3
 import jwt
 import requests
 import json
-import re # Necesario para buscar
+# import re 
 from dotenv import load_dotenv
+load_dotenv()
 import os
 from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from flask import abort
 
 app = Flask(__name__)
 DATABASE = "data/app.db"
@@ -124,6 +127,30 @@ def retrieve_context(log_message, knowledge_base):
     else:
         return "No se encontró información adicional relevante en la base de conocimiento para este log."
 
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = get_user_from_token()
+        if not user:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapper
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = get_user_from_token()
+        if not user:
+            return redirect(url_for('login'))
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT role FROM users WHERE username=?", (user,))
+            row = c.fetchone()
+        if not row or row[0] != 'admin':
+            return "Acceso denegado", 403
+        return f(*args, **kwargs)
+    return wrapper
+
 @app.route('/')
 def index():
     username = get_user_from_token()
@@ -168,7 +195,13 @@ def login():
         if user and check_password_hash(user[2], password):  # user[2] es la columna 'password'
             token = create_token(username)
             resp = make_response(redirect(url_for('index')))
-            resp.set_cookie('token', token)
+            resp.set_cookie(
+                'token', token,
+                httponly=True,
+                secure=False,        # ponlo True en producción (HTTPS)
+                samesite='Strict',  # o 'Lax' si necesitas cross-site
+                max_age=7200
+            )
             return resp
         else:
             error = "Credenciales incorrectas"
@@ -198,6 +231,7 @@ def register():
 
 # Ver listado de usuarios
 @app.route('/admin/users')
+@admin_required
 def manage_users():
     current_user = get_user_from_token()
     if not current_user:
@@ -216,6 +250,7 @@ def manage_users():
 
 # Crear nuevo usuario
 @app.route('/admin/users/add', methods=['POST'])
+@admin_required
 def add_user():
     current_user = get_user_from_token()
     if not current_user:
@@ -242,6 +277,7 @@ def add_user():
 
 # Eliminar usuario
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@admin_required
 def delete_user(user_id):
     current_user = get_user_from_token()
     if not current_user:
@@ -258,6 +294,7 @@ def delete_user(user_id):
 
 # Editar modelo usuario
 @app.route('/admin/users/update_model/<int:user_id>', methods=['POST'])
+@admin_required
 def update_model(user_id):
     current_user = get_user_from_token()
     if not current_user:
@@ -505,7 +542,7 @@ Responde exclusivamente en formato JSON con dos campos:
             data["ollama_diagnosis"] = "ERROR"
             data["ollama_reasoning"] = "Respuesta inesperada de Ollama"
 
-        data['model'] = model_actual    
+        data['model'] = ollama_model    
         
         # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
         risk_level = data.get('ollama_diagnosis', '').upper()
