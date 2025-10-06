@@ -429,7 +429,7 @@ Responde exclusivamente en formato JSON con dos campos:
                     data["ollama_reasoning"] = "Respuesta inesperada de Ollama"
                 
                 data['model'] = model_actual
-
+                data['risk_level'] = risk_level
                 # Extraer la primera palabra (esperada: CRÍTICO, ALTO, MEDIO, BAJO)
                 risk_level = data.get('ollama_diagnosis', '').upper()
                 if risk_level not in ["CRÍTICO", "ALTO", "MEDIO", "BAJO"]:
